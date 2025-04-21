@@ -13,12 +13,13 @@ class TabulaeGUI:
         
     def setup_ui(self):
         self.root.title("Tabulae GUI")
-        self.root.geometry("800x600")
+        self.root.geometry("1000x600")
         
         # Configure styles
         style = ttk.Style()
         style.configure("TFrame", background="#f0f0f0")
         style.configure("TButton", padding=5)
+        style.configure("Treeview.Heading", font=('Helvetica', 10, 'bold'))
         
         # Create main container
         main_frame = ttk.Frame(self.root)
@@ -36,16 +37,30 @@ class TabulaeGUI:
         self.output_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.output_text.configure(state=tk.DISABLED)
         
-        # History panel
-        history_frame = ttk.Frame(main_frame)
-        history_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        # Tables panel
+        tables_frame = ttk.Frame(main_frame)
+        tables_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10,0))
         
-        self.history_list = tk.Listbox(
-            history_frame,
-            width=30,
-            font=font.Font(family="Consolas", size=10)
+        self.tables_tree = ttk.Treeview(
+            tables_frame,
+            columns=('type',),
+            show='tree',
+            selectmode='browse'
         )
-        self.history_list.pack(fill=tk.Y, expand=True)
+        self.tables_tree.heading('#0', text='Tables', anchor=tk.W)
+        self.tables_tree.column('#0', width=200)
+        self.tables_tree.pack(fill=tk.BOTH, expand=True)
+        
+        # Table details panel
+        self.details_text = scrolledtext.ScrolledText(
+            tables_frame,
+            wrap=tk.WORD,
+            font=font.Font(family="Consolas", size=9),
+            height=10,
+            bg="#f8f8f8"
+        )
+        self.details_text.pack(fill=tk.BOTH, expand=True)
+        self.details_text.configure(state=tk.DISABLED)
         
         # Input area
         input_frame = ttk.Frame(self.root)
@@ -66,6 +81,9 @@ class TabulaeGUI:
             command=self.execute_command
         ).pack(side=tk.LEFT, padx=(5,0))
         
+        # Initial update
+        self.update_tables_display()
+        
     def execute_command(self, event=None):
         command = self.input_entry.get().strip()
         self.input_entry.delete(0, tk.END)
@@ -75,7 +93,6 @@ class TabulaeGUI:
         
         self.command_history.append(command)
         self.history_index = len(self.command_history)
-        self.update_history_list()
         
         try:
             result = []
@@ -94,6 +111,7 @@ class TabulaeGUI:
             result.append(f"Error: {str(e)}")
         
         self.display_output(command, '\n'.join(result))
+        self.update_tables_display()
     
     def display_output(self, command, result):
         self.output_text.configure(state=tk.NORMAL)
@@ -103,10 +121,54 @@ class TabulaeGUI:
         self.output_text.configure(state=tk.DISABLED)
         self.output_text.see(tk.END)
     
-    def update_history_list(self):
-        self.history_list.delete(0, tk.END)
-        for cmd in self.command_history[-10:]:  # Show last 10 commands
-            self.history_list.insert(tk.END, cmd)
+    def update_tables_display(self):
+        # Clear existing items
+        for item in self.tables_tree.get_children():
+            self.tables_tree.delete(item)
+        
+        # Add tables and columns
+        for table_name, table_data in self.interpreter.vars.items():
+            if isinstance(table_data, dict) and 'columns' in table_data:
+                table_id = self.tables_tree.insert(
+                    '', 'end', 
+                    text=table_name,
+                    values=('table',)
+                )
+                for col in table_data['columns']:
+                    self.tables_tree.insert(
+                        table_id, 'end',
+                        text=col,
+                        values=('column',)
+                    )
+        
+        # Set up selection binding
+        self.tables_tree.bind('<<TreeviewSelect>>', self.show_table_details)
+    
+    def show_table_details(self, event):
+        self.details_text.configure(state=tk.NORMAL)
+        self.details_text.delete(1.0, tk.END)
+        
+        selected = self.tables_tree.selection()
+        if not selected:
+            return
+        
+        item = self.tables_tree.item(selected[0])
+        if item['values'][0] == 'table':
+            table_name = item['text']
+            table_data = self.interpreter.vars.get(table_name)
+            
+            if table_data and isinstance(table_data, dict):
+                columns = table_data.get('columns', [])
+                row_count = len(table_data.get('data', []))
+                
+                self.details_text.insert(tk.END,
+                    f"Table: {table_name}\n"
+                    f"Columns: {len(columns)}\n"
+                    f"Rows: {row_count}\n\n"
+                    f"Columns:\n- " + "\n- ".join(columns)
+                )
+        
+        self.details_text.configure(state=tk.DISABLED)
     
     def navigate_history(self, event):
         if self.command_history:

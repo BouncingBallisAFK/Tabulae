@@ -27,7 +27,10 @@ cd tabulae
 # Run directly
 python3 tabulae.py [script.tadb]
 ```
-
+Tabulae GUI also requires tkinter:
+```bash
+pip install tkinter --user
+```
 ## Quick Start
 
 ### REPL Mode
