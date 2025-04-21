@@ -49,7 +49,7 @@ class Lexer:
             (r'maketable\b', 'MAKETABLE'),
             (r'editrow\b', 'EDITROW'),
             (r'exportcsv\b', 'EXPORTCSV'),
-            (r'RUNASFILE\b', 'RUNASFILE'),
+            (r'runfile\b', 'RUNASFILE'),
             (r'[a-zA-Z_][a-zA-Z0-9_]*', 'IDENTIFIER'),
         ]
 
