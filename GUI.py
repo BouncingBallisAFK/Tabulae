@@ -8,7 +8,8 @@ from contextlib import redirect_stdout
 class TabulaeGUI:
     def __init__(self, root):
         self.root = root
-        self.interpreter = Interpreter()
+        self.repl_interpreter = Interpreter()  # Separate interpreter for REPL
+        self.editor_interpreter = Interpreter()  # Separate interpreter for Editor
         self.command_history = []
         self.history_index = -1
         self.current_file = None
@@ -111,7 +112,7 @@ class TabulaeGUI:
             command=self.clear_repl_output
         ).pack(side=tk.LEFT, padx=(5,0))
         
-        self.update_tables_display()
+        self.update_tables_display(self.repl_interpreter, self.tables_tree)
         
     def setup_editor_tab(self):
         editor_frame = ttk.Frame(self.notebook)
@@ -178,7 +179,7 @@ class TabulaeGUI:
         )
         self.editor_output.pack(fill=tk.BOTH, expand=False, padx=10, pady=(0,10))
         self.editor_output.configure(state=tk.DISABLED)
-        
+
     def execute_repl_command(self, event=None):
         command = self.input_entry.get().strip()
         self.input_entry.delete(0, tk.END)
@@ -192,7 +193,7 @@ class TabulaeGUI:
         output_buffer = io.StringIO()
         try:
             with redirect_stdout(output_buffer):
-                self.interpreter.run(command)
+                self.repl_interpreter.run(command)
             output = output_buffer.getvalue()
             if not output:
                 output = f"Command executed: {command}"
@@ -202,8 +203,8 @@ class TabulaeGUI:
         finally:
             output_buffer.close()
         
-        self.update_tables_display()
-    
+        self.update_tables_display(self.repl_interpreter, self.tables_tree)
+
     def execute_editor(self):
         code = self.editor_text.get("1.0", tk.END).strip()
         if not code:
@@ -212,7 +213,7 @@ class TabulaeGUI:
         output_buffer = io.StringIO()
         try:
             with redirect_stdout(output_buffer):
-                self.interpreter.run(code)
+                self.editor_interpreter.run(code)
             output = output_buffer.getvalue()
             if not output:
                 output = "Script executed successfully"
@@ -221,35 +222,33 @@ class TabulaeGUI:
             self.display_editor_output(f"Error: {str(e)}")
         finally:
             output_buffer.close()
-        
-        self.update_tables_display()
-    
+
     def display_repl_output(self, command, result):
         self.output_text.configure(state=tk.NORMAL)
         self.output_text.insert(tk.END, f">>> {command}\n")
         self.output_text.insert(tk.END, f"{result}\n\n")
         self.output_text.configure(state=tk.DISABLED)
         self.output_text.see(tk.END)
-    
+
     def display_editor_output(self, result):
         self.editor_output.configure(state=tk.NORMAL)
         self.editor_output.delete(1.0, tk.END)
         self.editor_output.insert(tk.END, result)
         self.editor_output.configure(state=tk.DISABLED)
         self.editor_output.see(tk.END)
-    
-    def update_tables_display(self):
-        for item in self.tables_tree.get_children():
-            self.tables_tree.delete(item)
+
+    def update_tables_display(self, interpreter, tree_widget):
+        for item in tree_widget.get_children():
+            tree_widget.delete(item)
         
-        for table_name, table_data in self.interpreter.vars.items():
+        for table_name, table_data in interpreter.vars.items():
             if isinstance(table_data, dict) and 'columns' in table_data:
-                table_id = self.tables_tree.insert('', 'end', text=table_name, values=('table',))
+                table_id = tree_widget.insert('', 'end', text=table_name, values=('table',))
                 for col in table_data['columns']:
-                    self.tables_tree.insert(table_id, 'end', text=col, values=('column',))
+                    tree_widget.insert(table_id, 'end', text=col, values=('column',))
         
-        self.tables_tree.bind('<<TreeviewSelect>>', self.show_table_details)
-    
+        tree_widget.bind('<<TreeviewSelect>>', self.show_table_details)
+
     def show_table_details(self, event):
         self.details_text.configure(state=tk.NORMAL)
         self.details_text.delete(1.0, tk.END)
@@ -264,7 +263,7 @@ class TabulaeGUI:
         if item['values'][0] == 'column':
             table_name = self.tables_tree.item(parent_item)['text']
             column_name = item['text']
-            table_data = self.interpreter.vars.get(table_name)
+            table_data = self.repl_interpreter.vars.get(table_name)
             
             if table_data and isinstance(table_data, dict):
                 columns = table_data.get('columns', [])
@@ -289,7 +288,7 @@ class TabulaeGUI:
         
         elif item['values'][0] == 'table':
             table_name = item['text']
-            table_data = self.interpreter.vars.get(table_name)
+            table_data = self.repl_interpreter.vars.get(table_name)
             
             if table_data and isinstance(table_data, dict):
                 columns = table_data.get('columns', [])
@@ -303,7 +302,7 @@ class TabulaeGUI:
                 )
         
         self.details_text.configure(state=tk.DISABLED)
-    
+
     def navigate_history(self, event):
         if self.command_history:
             if event.keysym == "Up" and self.history_index > 0:
@@ -314,7 +313,7 @@ class TabulaeGUI:
             if 0 <= self.history_index < len(self.command_history):
                 self.input_entry.delete(0, tk.END)
                 self.input_entry.insert(0, self.command_history[self.history_index])
-    
+
     def save_repl_history(self):
         file_path = filedialog.asksaveasfilename(
             defaultextension=".tadb",
@@ -330,7 +329,7 @@ class TabulaeGUI:
                 self.display_repl_output("[System]", f"Saved {len(self.command_history)} commands to {file_path}")
             except Exception as e:
                 self.display_repl_output("[Error]", f"Failed to save: {str(e)}")
-    
+
     def new_file(self):
         if self.current_file or self.editor_text.get("1.0", tk.END).strip():
             if not messagebox.askyesno("New File", "Unsaved changes will be lost. Continue?"):
@@ -338,7 +337,7 @@ class TabulaeGUI:
         self.editor_text.delete("1.0", tk.END)
         self.current_file = None
         self.clear_editor_output()
-    
+
     def open_file(self):
         if self.current_file or self.editor_text.get("1.0", tk.END).strip():
             if not messagebox.askyesno("Open File", "Unsaved changes will be lost. Continue?"):
@@ -359,13 +358,13 @@ class TabulaeGUI:
                 self.display_editor_output(f"Loaded {file_path}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to open file: {str(e)}")
-    
+
     def save_file(self):
         if self.current_file:
             self._save_to_file(self.current_file)
         else:
             self.save_file_as()
-    
+
     def save_file_as(self):
         file_path = filedialog.asksaveasfilename(
             defaultextension=".tadb",
@@ -376,7 +375,7 @@ class TabulaeGUI:
         if file_path:
             self._save_to_file(file_path)
             self.current_file = file_path
-    
+
     def _save_to_file(self, file_path):
         try:
             content = self.editor_text.get("1.0", tk.END)
@@ -385,12 +384,12 @@ class TabulaeGUI:
             self.display_editor_output(f"Saved to {file_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save file: {str(e)}")
-    
+
     def clear_repl_output(self):
         self.output_text.configure(state=tk.NORMAL)
         self.output_text.delete(1.0, tk.END)
         self.output_text.configure(state=tk.DISABLED)
-    
+
     def clear_editor_output(self):
         self.editor_output.configure(state=tk.NORMAL)
         self.editor_output.delete(1.0, tk.END)
