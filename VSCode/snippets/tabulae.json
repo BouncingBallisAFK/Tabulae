@@ -1,0 +1,10 @@
+{
+  "Make Table": {
+    "prefix": "maketable",
+    "body": "maketable ${1:table_name} [${2:column1}, ${3:column2}]"
+  },
+  "Edit Row": {
+    "prefix": "editrow",
+    "body": "editrow ${1:table_name} [${2:values}]"
+  }
+}

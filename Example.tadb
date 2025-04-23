@@ -1,0 +1,3 @@
+maketable username [id, name]
+editrow username [1, "Bob"]
+query username

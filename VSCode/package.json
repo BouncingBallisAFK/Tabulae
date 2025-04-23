@@ -1,0 +1,25 @@
+{
+  "name": "tabulae-language",
+  "displayName": "Tabulae Language Support",
+  "description": "Syntax highlighting for Tabulae files",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "tabulae",
+      "aliases": ["Tabulae", "tabulae"],
+      "extensions": [".tadb"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "tabulae",
+      "scopeName": "source.tadb",
+      "path": "./syntaxes/tabulae.tmLanguage.json"
+    }]
+  }
+}
