@@ -1,3 +1,8 @@
-maketable username [id, name]
-editrow username [1, "Bob"]
-query username
+maketable usernames [id, name]
+editrow usernames [1, "Bob"]
+editrow usernames [2, "Joe"]
+editrow usernames [3, "Jeff"]
+editrow usernames [4, "Jim"]
+editrow usernames [5, "Billy"]
+query usernames id<=3
+query usernames
